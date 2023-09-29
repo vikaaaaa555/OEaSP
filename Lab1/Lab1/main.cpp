@@ -256,8 +256,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case ID_BUTTON_SQUARE_ROOT:
-            if (!g_isNewInput)
-            {
+            //if (!g_isNewInput)
+            //{
                 double newValue = std::wcstod(g_inputText.c_str(), nullptr);
                 if (newValue >= 0.0)
                 {
@@ -273,7 +273,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     g_inputText.clear();
                     SetWindowText(g_hEdit, L"");
                 }
-            }
+            //}
+            //else
+            //{
+            //    MessageBox(hWnd, L"Invalid input for square root.", L"Error", MB_OK | MB_ICONERROR);
+            //    g_currentValue = 0.0;
+            //    g_inputText.clear();
+            //    SetWindowText(g_hEdit, L"");
+            //}
             break;
         }
         break;
