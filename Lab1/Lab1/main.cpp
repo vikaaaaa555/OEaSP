@@ -4,7 +4,8 @@
 
 #define PI 3.14159265358979323846
 
-#define ID_EDIT 1000
+#define ID_EDIT     1000
+
 #define ID_BUTTON_0 1001
 #define ID_BUTTON_1 1002
 #define ID_BUTTON_2 1003
@@ -15,7 +16,8 @@
 #define ID_BUTTON_7 1008
 #define ID_BUTTON_8 1009
 #define ID_BUTTON_9 1010
-#define ID_BUTTON_ADD 1011
+
+#define ID_BUTTON_ADD   1011
 #define ID_BUTTON_SUBTRACT 1012
 #define ID_BUTTON_MULTIPLY 1013
 #define ID_BUTTON_DIVIDE 1014
@@ -23,36 +25,107 @@
 #define ID_BUTTON_CLEAR 1016
 #define ID_BUTTON_SQUARE_ROOT 1017
 #define ID_BUTTON_DECIMAL 1018
+
 #define ID_BUTTON_SIN 1019
 #define ID_BUTTON_COS 1020
 #define ID_BUTTON_TAN 1021
 #define ID_BUTTON_COT 1022
 #define ID_BUTTON_DEGREES 1023
 
+#define ID_EDIT_RED 1024
+#define ID_EDIT_GREEN 1025
+#define ID_EDIT_BLUE 1026
+#define ID_BUTTON_CHANGE 1027
+
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 double Trigonometric(const std::wstring& functionName, double value);
 
-HWND g_hEdit;
+HWND g_hEdit, hActiveWindow;
+HHOOK hKeyboardHook;
 std::wstring g_inputText;
 double g_currentValue = 0.0;
 bool g_isNewInput = true;
 bool g_decimalEntered = false;
 std::wstring g_operator; // Хранение текущего оператора.
+COLORREF colour = RGB(178, 132, 190);
+
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode >= 0) {
+        if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+            KBDLLHOOKSTRUCT* pKbStruct = (KBDLLHOOKSTRUCT*)lParam;
+
+            if (pKbStruct->scanCode == 0x1C) {
+                hActiveWindow = GetForegroundWindow();
+
+                HWND hButton = GetDlgItem(hActiveWindow, ID_BUTTON_EQUALS);
+
+                if (hButton != NULL) {
+                    SendMessage(hButton, BM_CLICK, 0, 0);
+                }
+            }
+
+            else if (pKbStruct->scanCode == 0x0C) {
+                hActiveWindow = GetForegroundWindow();
+
+                HWND hButton = GetDlgItem(hActiveWindow, ID_BUTTON_SUBTRACT);
+
+                if (hButton != NULL) {
+                    SendMessage(hButton, BM_CLICK, 0, 0);
+                }
+            }
+
+            else if (pKbStruct->scanCode == 0x35) {
+                hActiveWindow = GetForegroundWindow();
+
+                HWND hButton = GetDlgItem(hActiveWindow, ID_BUTTON_DIVIDE);
+
+                if (hButton != NULL) {
+                    SendMessage(hButton, BM_CLICK, 0, 0);
+                }
+            }
+
+            else if (pKbStruct->scanCode == 0x34) {
+                hActiveWindow = GetForegroundWindow();
+
+                HWND hButton = GetDlgItem(hActiveWindow, ID_BUTTON_DECIMAL);
+
+                if (hButton != NULL) {
+                    SendMessage(hButton, BM_CLICK, 0, 0);
+                }
+            }
+
+            else if (GetAsyncKeyState(0x10) && GetAsyncKeyState(0xBB) && GetAsyncKeyState(0x10) && GetAsyncKeyState(0xBB)) {
+                hActiveWindow = GetForegroundWindow();
+
+                HWND hButton = GetDlgItem(hActiveWindow, ID_BUTTON_ADD);
+
+                if (hButton != NULL) {
+                    SendMessage(hButton, BM_CLICK, 0, 0);
+                }
+            }
+        }
+    }
+
+    return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
+}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     WNDCLASSEX wcex;
     memset(&wcex, 0, sizeof(WNDCLASSEX));
     wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc = WndProc;
     wcex.hInstance = hInstance;
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = CreateSolidBrush(RGB(255, 192, 203));
     wcex.lpszClassName = L"Calculator";
     RegisterClassEx(&wcex);
 
-    HWND hWnd = CreateWindow(L"Calculator", L"Calculator", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 400, 500, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindow(L"Calculator", L"Calculator", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        CW_USEDEFAULT, CW_USEDEFAULT, 400, 525, nullptr, nullptr, hInstance, nullptr);
+
+    HHOOK hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, hInstance, 0);
 
     if (!hWnd)
     {
@@ -61,6 +134,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     g_hEdit = CreateWindow(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_RIGHT | ES_READONLY,
         10, 10, 360, 50, hWnd, (HMENU)ID_EDIT, hInstance, nullptr);
+
+    CreateWindow(L"EDIT", L"178", WS_CHILD | WS_VISIBLE , 10, 460, 115, 15, hWnd, (HMENU)ID_EDIT_RED, hInstance, nullptr);
+    CreateWindow(L"EDIT", L"132", WS_CHILD | WS_VISIBLE , 130, 460, 115, 15, hWnd, (HMENU)ID_EDIT_GREEN, hInstance, nullptr);
+    CreateWindow(L"EDIT", L"190", WS_CHILD | WS_VISIBLE , 250, 460, 115, 15, hWnd, (HMENU)ID_EDIT_BLUE, hInstance, nullptr);
+    //CreateWindow(L"BUTTON", L"change", WS_CHILD | WS_VISIBLE, 280, 460, 80, 15, hWnd, (HMENU)ID_BUTTON_CHANGE, hInstance, nullptr);
 
     CreateWindow(L"BUTTON", L"0", WS_CHILD | WS_VISIBLE, 100, 400, 80, 50, hWnd, (HMENU)ID_BUTTON_0, hInstance, nullptr);
     CreateWindow(L"BUTTON", L"1", WS_CHILD | WS_VISIBLE, 10, 340, 80, 50, hWnd, (HMENU)ID_BUTTON_1, hInstance, nullptr);
@@ -187,7 +265,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         }
                     }
 
+                    // Преобразование в строку.
                     g_inputText = std::to_wstring(g_currentValue);
+
+                    // Цикл удаления нулей до числа или точки.
+                    size_t pos = g_inputText.length() - 1;
+                    bool pnt = false;
+                    while (pos--)
+                    {
+                        if (g_inputText[pos] == L'.') pnt = true;
+                    }
+                    pos = g_inputText.length();
+                    if (pnt) {
+                        while (pos > 0 && (g_inputText[pos - 1] == L'0' || g_inputText[pos - 1] == L'.'))
+                        {
+                            pos--;
+                            if (g_inputText[pos] == L'.')break;
+                        }
+                        g_inputText.resize(pos);
+                    }
+                    
                     g_isNewInput = true;
                     SetWindowText(g_hEdit, g_inputText.c_str());
                 }
@@ -198,31 +295,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case ID_BUTTON_COS:
         case ID_BUTTON_TAN:
         case ID_BUTTON_COT:
-            if (!g_isNewInput)
+        {
+            double newValue = std::wcstod(g_inputText.c_str(), nullptr);
+            switch (LOWORD(wParam))
             {
-                double newValue = std::wcstod(g_inputText.c_str(), nullptr);
-                switch (LOWORD(wParam))
-                {
-                case ID_BUTTON_SIN:
-                    g_operator = L"sin";
-                    break;
-                case ID_BUTTON_COS:
-                    g_operator = L"cos";
-                    break;
-                case ID_BUTTON_TAN:
-                    g_operator = L"tg";
-                    break;
-                case ID_BUTTON_COT:
-                    g_operator = L"ctg";
-                    break;
-                }
-        
-                double result = Trigonometric(g_operator, newValue);
-                g_currentValue = result;
-                g_inputText = std::to_wstring(result);
-                g_isNewInput = true;
-                SetWindowText(g_hEdit, g_inputText.c_str());
+            case ID_BUTTON_SIN:
+                g_operator = L"sin";
+                break;
+            case ID_BUTTON_COS:
+                g_operator = L"cos";
+                break;
+            case ID_BUTTON_TAN:
+                g_operator = L"tg";
+                break;
+            case ID_BUTTON_COT:
+                g_operator = L"ctg";
+                break;
             }
+
+            double result = Trigonometric(g_operator, newValue);
+            g_currentValue = result;
+            g_inputText = std::to_wstring(result);
+            g_isNewInput = true;
+            SetWindowText(g_hEdit, g_inputText.c_str());
+        }
             break;
 
         case ID_BUTTON_DEGREES:
@@ -256,33 +352,50 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case ID_BUTTON_SQUARE_ROOT:
-            //if (!g_isNewInput)
-            //{
-                double newValue = std::wcstod(g_inputText.c_str(), nullptr);
-                if (newValue >= 0.0)
-                {
-                    g_currentValue = sqrt(newValue);
-                    g_inputText = std::to_wstring(g_currentValue);
-                    g_isNewInput = true;
-                    SetWindowText(g_hEdit, g_inputText.c_str());
-                }
-                else
-                {
-                    MessageBox(hWnd, L"Invalid input for square root.", L"Error", MB_OK | MB_ICONERROR);
-                    g_currentValue = 0.0;
-                    g_inputText.clear();
-                    SetWindowText(g_hEdit, L"");
-                }
-            //}
-            //else
-            //{
-            //    MessageBox(hWnd, L"Invalid input for square root.", L"Error", MB_OK | MB_ICONERROR);
-            //    g_currentValue = 0.0;
-            //    g_inputText.clear();
-            //    SetWindowText(g_hEdit, L"");
-            //}
+            double newValue = std::wcstod(g_inputText.c_str(), nullptr);
+            if (newValue >= 0.0)
+            {
+                g_currentValue = sqrt(newValue);
+                g_inputText = std::to_wstring(g_currentValue);
+                g_isNewInput = true;
+                SetWindowText(g_hEdit, g_inputText.c_str());
+            }
+            else
+            {
+                MessageBox(hWnd, L"Invalid input for square root.", L"Error", MB_OK | MB_ICONERROR);
+                g_currentValue = 0.0;
+                g_inputText.clear();
+                SetWindowText(g_hEdit, L"");
+            }
             break;
         }
+        case ID_BUTTON_CHANGE:
+        {
+            colour = RGB(GetDlgItemInt(hWnd, ID_EDIT_RED, nullptr, false),
+                GetDlgItemInt(hWnd, ID_EDIT_GREEN, nullptr, false),
+                GetDlgItemInt(hWnd, ID_EDIT_BLUE, nullptr, false));
+            RedrawWindow(hWnd, nullptr, nullptr, RDW_UPDATENOW | RDW_INVALIDATE);
+        }
+            break;
+
+        break;
+
+    case WM_CTLCOLOREDIT:
+    {
+        HDC hdc = (HDC)wParam;
+        SetBkColor(hdc, colour);
+        SetTextColor(hdc, RGB(171, 39, 79));
+    }
+        break;
+
+    case WM_CTLCOLORSTATIC:
+    {
+        HDC hdc = (HDC)wParam;
+        SetBkColor(hdc, colour);
+        //SetBkColor(hdc, RGB(178, 132, 190));
+        SetTextColor(hdc, RGB(171, 39, 79));
+        return (INT_PTR)CreateSolidBrush(colour);
+    }
         break;
 
     case WM_DESTROY:
@@ -305,7 +418,7 @@ double Trigonometric(const std::wstring& functionName, double value)
     {
         return cos(value * PI / 180);
     }
-    else if (functionName == L"tan")
+    else if (functionName == L"tg")
     {
         return tan(value * PI / 180);
     }
@@ -315,3 +428,5 @@ double Trigonometric(const std::wstring& functionName, double value)
     }
     else return 0.0;
 }
+
+
