@@ -4,8 +4,14 @@ LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 HWND hwndListView = nullptr;
 void UpdateProcessList(HWND);
 void EnumThreadsInProcess(DWORD, DWORD&);
+void SuspendProcess(DWORD);
+void ResumeProcess(DWORD processId);
+int index = -1;
+int suspendIndex = -1;
+int resumeIndex = -1;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+
     WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
     wcex.lpfnWndProc = WndProc;
     wcex.hInstance = hInstance;
@@ -35,13 +41,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE: {
+
         // Создать ListView для отображения списка процессов
         hwndListView = CreateWindow(WC_LISTVIEW, L"", WS_VISIBLE | WS_CHILD | LVS_REPORT,
             10, 10, 480, 300, hWnd, (HMENU)ID_LISTVIEW, nullptr, nullptr);
-
         
         HWND hwndButton = CreateWindow(L"BUTTON", L"End Task", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-            10, 325, 80, 25, hWnd, (HMENU)ID_BUTTON_ENDTASK, GetModuleHandle(NULL), NULL);
+            10, 325, 80, 25, hWnd, (HMENU)ID_BUTTON_ENDTASK, GetModuleHandle(nullptr), nullptr);
+
+        HWND hwndButtonSuspend = CreateWindow(L"BUTTON", L"Suspend", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            100, 325, 80, 25, hWnd, (HMENU)ID_BUTTON_SUSPEND, GetModuleHandle(nullptr), nullptr);
+
+        HWND hwndButtonResume = CreateWindow(L"BUTTON", L"Resume", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            190, 325, 80, 25, hWnd, (HMENU)ID_BUTTON_RESUME, GetModuleHandle(nullptr), nullptr);
 
 
         // Инициализировать ListView
@@ -79,7 +91,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         switch (LOWORD(wParam)) {
         case ID_BUTTON_ENDTASK:
             // Пройдите по всем элементам ListView и найдите выделенный
-            int index = -1;
+            
             for (int i = 0; i < ListView_GetItemCount(hwndListView); ++i) {
                 if (ListView_GetCheckState(hwndListView, i)) {
                     index = i;
@@ -105,6 +117,48 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                     // Обновить список процессов
                     UpdateProcessList(hwndListView);
                 }
+            }
+            break;
+
+        case ID_BUTTON_SUSPEND:
+            // Пройдите по всем элементам ListView и найдите выделенный
+            
+            for (int i = 0; i < ListView_GetItemCount(hwndListView); ++i) {
+                if (ListView_GetCheckState(hwndListView, i)) {
+                    suspendIndex = i;
+                    break;
+                }
+            }
+
+            if (suspendIndex != -1) {
+                // Получите PID выбранного процесса
+                wchar_t buffer[256];
+                ListView_GetItemText(hwndListView, suspendIndex, 2, buffer, sizeof(buffer));
+                DWORD pid = _wtoi(buffer);
+
+                // Приостановить процесс
+                SuspendProcess(pid);
+            }
+            break;
+
+        case ID_BUTTON_RESUME:
+            // Пройдите по всем элементам ListView и найдите выделенный
+            
+            for (int i = 0; i < ListView_GetItemCount(hwndListView); ++i) {
+                if (ListView_GetCheckState(hwndListView, i)) {
+                    resumeIndex = i;
+                    break;
+                }
+            }
+
+            if (resumeIndex != -1) {
+                // Получите PID выбранного процесса
+                wchar_t buffer[256];
+                ListView_GetItemText(hwndListView, resumeIndex, 2, buffer, sizeof(buffer));
+                DWORD pid = _wtoi(buffer);
+
+                // Возобновить процесс
+                ResumeProcess(pid);
             }
             break;
         }
@@ -216,3 +270,52 @@ void EnumThreadsInProcess(DWORD processId, DWORD& threadCount) {
 
     CloseHandle(hThreadSnapshot);
 }
+
+void SuspendProcess(DWORD processId) {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
+    if (hSnapshot != INVALID_HANDLE_VALUE) {
+        THREADENTRY32 threadEntry;
+        threadEntry.dwSize = sizeof(THREADENTRY32);
+
+        if (Thread32First(hSnapshot, &threadEntry)) {
+            do {
+                if (threadEntry.th32OwnerProcessID == processId) {
+                    HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, threadEntry.th32ThreadID);
+
+                    if (hThread != nullptr) {
+                        SuspendThread(hThread);
+                        CloseHandle(hThread);
+                    }
+                }
+            } while (Thread32Next(hSnapshot, &threadEntry));
+        }
+
+        CloseHandle(hSnapshot);
+    }
+}
+
+void ResumeProcess(DWORD processId) {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
+    if (hSnapshot != INVALID_HANDLE_VALUE) {
+        THREADENTRY32 threadEntry;
+        threadEntry.dwSize = sizeof(THREADENTRY32);
+
+        if (Thread32First(hSnapshot, &threadEntry)) {
+            do {
+                if (threadEntry.th32OwnerProcessID == processId) {
+                    HANDLE hThread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, threadEntry.th32ThreadID);
+
+                    if (hThread != nullptr) {
+                        ResumeThread(hThread);
+                        CloseHandle(hThread);
+                    }
+                }
+            } while (Thread32Next(hSnapshot, &threadEntry));
+        }
+
+        CloseHandle(hSnapshot);
+    }
+}
+
