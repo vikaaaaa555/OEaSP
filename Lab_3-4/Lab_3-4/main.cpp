@@ -3,6 +3,7 @@
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 HWND hwndListView = nullptr;
 void UpdateProcessList(HWND);
+void EnumThreadsInProcess(DWORD, DWORD&);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
@@ -13,7 +14,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClassEx(&wcex);
 
     HWND hWnd = CreateWindow(L"Processes Monitor", L"Processes Monitor", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT, 360, 300, nullptr, nullptr, hInstance, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 400, 400, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd) {
         return false;
@@ -36,11 +37,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_CREATE: {
         // Создать ListView для отображения списка процессов
         hwndListView = CreateWindow(WC_LISTVIEW, L"", WS_VISIBLE | WS_CHILD | LVS_REPORT,
-            10, 10, 400, 200, hWnd, (HMENU)ID_LISTVIEW, nullptr, nullptr);
+            10, 10, 480, 300, hWnd, (HMENU)ID_LISTVIEW, nullptr, nullptr);
 
         
         HWND hwndButton = CreateWindow(L"BUTTON", L"End Task", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-            10, 220, 80, 25, hWnd, (HMENU)ID_BUTTON_ENDTASK, GetModuleHandle(NULL), NULL);
+            10, 325, 80, 25, hWnd, (HMENU)ID_BUTTON_ENDTASK, GetModuleHandle(NULL), NULL);
 
 
         // Инициализировать ListView
@@ -48,7 +49,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         lvColumn.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
 
         lvColumn.pszText = const_cast<LPWSTR>(L""); // Приведем к типу LPWSTR
-        lvColumn.cx = 10;
+        lvColumn.cx = 20;
         ListView_InsertColumn(hwndListView, 0, &lvColumn);
 
         lvColumn.pszText = const_cast<LPWSTR>(L"Process"); // Приведем к типу LPWSTR
@@ -60,8 +61,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         ListView_InsertColumn(hwndListView, 2, &lvColumn);
 
         lvColumn.pszText = const_cast<LPWSTR>(L"Memory (KB)"); // Приведем к типу LPWSTR
-        lvColumn.cx = 100;
+        lvColumn.cx = 90;
         ListView_InsertColumn(hwndListView, 3, &lvColumn);
+
+        lvColumn.pszText = const_cast<LPWSTR>(L"Threads"); // Приведем к типу LPWSTR
+        lvColumn.cx = 60;
+        ListView_InsertColumn(hwndListView, 4, &lvColumn);
+
+        ListView_SetExtendedListViewStyle(hwndListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT);
 
         // Обновить список процессов
         UpdateProcessList(hwndListView);
@@ -72,44 +79,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         switch (LOWORD(wParam)) {
         case ID_BUTTON_ENDTASK:
             // Пройдите по всем элементам ListView и найдите выделенный
+            int index = -1;
             for (int i = 0; i < ListView_GetItemCount(hwndListView); ++i) {
-                // Получите состояние элемента (включена или выключена радиокнопка)
-                UINT state = ListView_GetItemState(hwndListView, i, LVIS_STATEIMAGEMASK);
+                if (ListView_GetCheckState(hwndListView, i)) {
+                    index = i;
+                    break;
+                }
+            }
 
-                // Проверьте, установлен ли флаг для радиокнопки
-                bool isChecked = ((state & INDEXTOSTATEIMAGEMASK(2)) != 0); // 2 - индекс для флага "включено"
+            if (index != -1) {
+                // Получите PID выбранного процесса
+                wchar_t buffer[256];
+                ListView_GetItemText(hwndListView, index, 2, buffer, sizeof(buffer));
+                DWORD pid = _wtoi(buffer);
 
-                if (isChecked) {
-                    // Получите PID выбранного процесса
-                    LVITEM lvItem = { 0 };
-                    lvItem.mask = LVIF_STATE | LVIF_TEXT;
-                    lvItem.iItem = i;
-                    lvItem.iSubItem = 2; // колонка с PID
-                    lvItem.cchTextMax = 256;
-                    wchar_t buffer[256];
-                    lvItem.pszText = buffer;
-                    lvItem.stateMask = LVIS_STATEIMAGEMASK;
-                    ListView_GetItem(hwndListView, &lvItem);
-                    DWORD pid = _wtoi(buffer);
+                // Отправьте сигнал завершения процесса
+                HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+                if (hProcess != NULL) {
+                    TerminateProcess(hProcess, 0);
+                    CloseHandle(hProcess);
 
-                    // Отправьте сигнал завершения процесса
-                    HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-                    if (hProcess != NULL) {
-                        TerminateProcess(hProcess, 0);
-                        CloseHandle(hProcess);
+                    // Удалите элемент из ListView
+                    ListView_DeleteItem(hwndListView, index);
 
-                        // Удалите элемент из ListView
-                        ListView_DeleteItem(hwndListView, i);
-                    }
-
-                    break; // Прерывание цикла, так как мы уже обработали выбранный элемент
+                    // Обновить список процессов
+                    UpdateProcessList(hwndListView);
                 }
             }
             break;
         }
         break;
-
-
 
     case WM_CLOSE:
         DestroyWindow(hWnd);
@@ -153,6 +152,9 @@ void UpdateProcessList(HWND hwndListView) {
                     if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
                         DWORD pid = GetProcessId(hProcess);
 
+                        DWORD threadCount = 0;
+                        EnumThreadsInProcess(pid, threadCount);
+
                         // Получить временные данные процесса
                         FILETIME creationTime, exitTime, kernelTime, userTime;
                         GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime);
@@ -182,6 +184,10 @@ void UpdateProcessList(HWND hwndListView) {
                         ListView_SetItemText(hwndListView, itemIndex, 2, pidText); // PID
 
                         ListView_SetItemText(hwndListView, itemIndex, 3, buffer); // Установить размер в МБ в 3 колонку
+
+                        std::wstring threadCountString = std::to_wstring(threadCount);
+                        LPWSTR threadCountText = const_cast<LPWSTR>(threadCountString.c_str());
+                        ListView_SetItemText(hwndListView, itemIndex, 4, threadCountText);
                     }
                 }
                 // Закрыть дескриптор процесса
@@ -189,4 +195,24 @@ void UpdateProcessList(HWND hwndListView) {
             }
         }
     }
+}
+
+void EnumThreadsInProcess(DWORD processId, DWORD& threadCount) {
+    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (hThreadSnapshot == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    THREADENTRY32 threadEntry;
+    threadEntry.dwSize = sizeof(THREADENTRY32);
+
+    if (Thread32First(hThreadSnapshot, &threadEntry)) {
+        do {
+            if (threadEntry.th32OwnerProcessID == processId) {
+                threadCount++;
+            }
+        } while (Thread32Next(hThreadSnapshot, &threadEntry));
+    }
+
+    CloseHandle(hThreadSnapshot);
 }
