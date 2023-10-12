@@ -1,14 +1,17 @@
 ﻿#include "main.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-HWND hwndListView = nullptr;
 void UpdateProcessList(HWND);
 void EnumThreadsInProcess(DWORD, DWORD&);
 void SuspendProcess(DWORD);
-void ResumeProcess(DWORD processId);
+void ResumeProcess(DWORD);
+
+HWND hwndListView = nullptr;
 int index = -1;
 int suspendIndex = -1;
 int resumeIndex = -1;
+
+std::future<void> asyncTask;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 
@@ -41,6 +44,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE: {
+
+        asyncTask = std::async(std::launch::async, UpdateProcessList, hwndListView);
 
         // Создать ListView для отображения списка процессов
         hwndListView = CreateWindow(WC_LISTVIEW, L"", WS_VISIBLE | WS_CHILD | LVS_REPORT,
@@ -165,6 +170,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         break;
 
     case WM_CLOSE:
+        if (asyncTask.valid())
+            asyncTask.get();
+
         DestroyWindow(hWnd);
         break;
     case WM_DESTROY:

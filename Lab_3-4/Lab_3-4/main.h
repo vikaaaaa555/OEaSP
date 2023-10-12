@@ -5,6 +5,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <future>
+#include <thread>
 
 #include <psapi.h>
 #pragma comment(lib, "psapi.lib")
