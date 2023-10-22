@@ -1,11 +1,12 @@
 #include "main.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-//
 void MonitorVolumeChanges();
 void OnVolumeChange(float);
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD);
-//
+void SaveColorToRegistry(COLORREF);
+bool ReadColorFromRegistry(COLORREF&);
+void RestoreColorFromRegistry();
 
 HWND hWnd; // Глобальная переменная для хранения дескриптора окна
 COLORREF currentColor = RGB(178, 132, 190);
@@ -27,6 +28,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!hWnd) {
         return false;
     }
+
+    RestoreColorFromRegistry();
 
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
@@ -68,6 +71,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 }
 
 void OnVolumeChange(float newVolume) {
+    // Считать цвет из реестра при первом изменении громкости
+    static bool firstChange = true;
+    if (firstChange) {
+        COLORREF savedColor;
+        if (ReadColorFromRegistry(savedColor)) {
+            currentColor = savedColor;
+            targetColor = savedColor;
+        }
+        firstChange = false;
+    }
+
     // Пример: увеличьте ширину и высоту окна на значение громкости
     int newSize = static_cast<int>(600 * newVolume);
 
@@ -76,11 +90,13 @@ void OnVolumeChange(float newVolume) {
 
     // Обновить целевой цвет в зависимости от уровня громкости
     int red = static_cast<int>(255 * newVolume);
-    //int blue = static_cast<int>(255 * (1.0f - newVolume));
     targetColor = RGB(red, 132, 190);
 
     // Запустить таймер для плавного изменения цвета
     SetTimer(hWnd, 1, 100, nullptr);
+
+    // Сохраняем цвет в реестре
+    SaveColorToRegistry(targetColor);
 }
 
 void MonitorVolumeChanges() {
@@ -135,5 +151,41 @@ void CALLBACK TimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
     // Если достигнут целевой цвет, остановить таймер
     if (currentColor == targetColor) {
         KillTimer(hwnd, 1);
+    }
+}
+
+void SaveColorToRegistry(COLORREF color) {
+    HKEY hKey;
+    if (RegCreateKeyEx(HKEY_CURRENT_USER, L"Software\\YourAppName", 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+        DWORD dwData = color;
+        RegSetValueEx(hKey, L"WindowColor", 0, REG_DWORD, (BYTE*)&dwData, sizeof(dwData));
+        RegCloseKey(hKey);
+    }
+}
+
+bool ReadColorFromRegistry(COLORREF& color) {
+    HKEY hKey;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\YourAppName", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD dwData;
+        DWORD dwSize = sizeof(DWORD);
+
+        if (RegQueryValueEx(hKey, L"WindowColor", nullptr, nullptr, reinterpret_cast<LPBYTE>(&dwData), &dwSize) == ERROR_SUCCESS) {
+            color = static_cast<COLORREF>(dwData);
+            RegCloseKey(hKey);
+            return true;
+        }
+
+        RegCloseKey(hKey);
+    }
+    return false;
+}
+
+void RestoreColorFromRegistry() {
+    COLORREF restoredColor;
+    if (ReadColorFromRegistry(restoredColor)) {
+        // Установить цвет фона окна
+        HBRUSH hBrush = CreateSolidBrush(restoredColor);
+        SetClassLongPtr(hWnd, GCLP_HBRBACKGROUND, reinterpret_cast<LONG_PTR>(hBrush));
+        InvalidateRect(hWnd, nullptr, TRUE);
     }
 }
