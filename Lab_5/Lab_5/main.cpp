@@ -59,7 +59,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         break;
 
     case WM_TIMER:
-        TimerProc(hWnd, WM_TIMER, 1, GetTickCount());
+        TimerProc(hWnd, WM_TIMER, 1, GetTickCount64());
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
