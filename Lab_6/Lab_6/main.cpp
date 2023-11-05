@@ -1,22 +1,21 @@
 #include <windows.h>
 #include <tchar.h>
 #include <thread>
-#include <mutex>
 
-std::mutex mutex; // Мьютекс для синхронизации доступа к общей переменной
-int counter = 0; // Общая переменная, которую будут изменять потоки
+HANDLE hMutex; // Дескриптор мьютекса
+int counter = 0; // Общая переменная
 HWND hCounterLabel, hIncrementButton, hDecrementButton;
 
 #define WM_UPDATE_COUNTER (WM_USER + 1) // Сообщение для обновления счетчика
 
 void incrementCounter() {
     while (true) {
-        {
-            std::lock_guard<std::mutex> lock(mutex); // Захват мьютекса для безопасного доступа к counter
-            counter++;
-        }
+        WaitForSingleObject(hMutex, INFINITE); // Захват мьютекса
 
-        // Обновление метки счетчика
+        counter++;
+
+        ReleaseMutex(hMutex); // Освобождение мьютекса
+
         PostMessage(hCounterLabel, WM_UPDATE_COUNTER, 0, 0);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Задержка для имитации работы
@@ -25,10 +24,11 @@ void incrementCounter() {
 
 void decrementCounter() {
     while (true) {
-        {
-            std::lock_guard<std::mutex> lock(mutex);
-            counter--;
-        }
+        WaitForSingleObject(hMutex, INFINITE);
+
+        counter--;
+
+        ReleaseMutex(hMutex);
 
         PostMessage(hCounterLabel, WM_UPDATE_COUNTER, 0, 0);
 
@@ -50,8 +50,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         hIncrementButton = CreateWindow(_T("BUTTON"), _T("Increment"), WS_VISIBLE | WS_CHILD, 10, 40, 80, 20, hWnd, nullptr, nullptr, nullptr);
         hDecrementButton = CreateWindow(_T("BUTTON"), _T("Decrement"), WS_VISIBLE | WS_CHILD, 100, 40, 80, 20, hWnd, nullptr, nullptr, nullptr);
 
-        // Обновление метки счетчика при создании окна
         updateCounterLabel();
+
+        // Создание мьютекса
+        hMutex = CreateMutex(nullptr, FALSE, nullptr);
 
         // Запуск потоков в отдельном потоке
         std::thread(incrementCounter).detach();
@@ -61,23 +63,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         DestroyWindow(hWnd);
         break;
     case WM_DESTROY:
+        CloseHandle(hMutex); // Закрытие мьютекса при завершении приложения
         PostQuitMessage(0);
         break;
     case WM_UPDATE_COUNTER:
-        // Обновление счетчика
         updateCounterLabel();
         break;
     case WM_COMMAND:
         if (lParam == (LPARAM)hIncrementButton) {
-            // Инкремент
-            std::lock_guard<std::mutex> lock(mutex);
+            WaitForSingleObject(hMutex, INFINITE);
             counter++;
+            ReleaseMutex(hMutex);
             updateCounterLabel();
         }
         else if (lParam == (LPARAM)hDecrementButton) {
-            // Декремент
-            std::lock_guard<std::mutex> lock(mutex);
+            WaitForSingleObject(hMutex, INFINITE);
             counter--;
+            ReleaseMutex(hMutex);
             updateCounterLabel();
         }
         break;
