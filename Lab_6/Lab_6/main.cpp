@@ -1,6 +1,5 @@
 #include <windows.h>
 #include <tchar.h>
-#include <thread>
 
 HANDLE hMutex; // Дескриптор мьютекса
 int counter = 0; // Общая переменная
@@ -8,7 +7,7 @@ HWND hCounterLabel, hIncrementButton, hDecrementButton;
 
 #define WM_UPDATE_COUNTER (WM_USER + 1) // Сообщение для обновления счетчика
 
-void incrementCounter() {
+DWORD WINAPI incrementCounter(LPVOID lpParam) {
     while (true) {
         WaitForSingleObject(hMutex, INFINITE); // Захват мьютекса
 
@@ -18,11 +17,11 @@ void incrementCounter() {
 
         PostMessage(hCounterLabel, WM_UPDATE_COUNTER, 0, 0);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Задержка для имитации работы
+        Sleep(500); // Задержка для имитации работы
     }
 }
 
-void decrementCounter() {
+DWORD WINAPI decrementCounter(LPVOID lpParam) {
     while (true) {
         WaitForSingleObject(hMutex, INFINITE);
 
@@ -32,7 +31,7 @@ void decrementCounter() {
 
         PostMessage(hCounterLabel, WM_UPDATE_COUNTER, 0, 0);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        Sleep(500);
     }
 }
 
@@ -56,8 +55,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         hMutex = CreateMutex(nullptr, FALSE, nullptr);
 
         // Запуск потоков в отдельном потоке
-        std::thread(incrementCounter).detach();
-        std::thread(decrementCounter).detach();
+        CreateThread(nullptr, 0, incrementCounter, nullptr, 0, nullptr);
+        CreateThread(nullptr, 0, decrementCounter, nullptr, 0, nullptr);
         break;
     case WM_CLOSE:
         DestroyWindow(hWnd);
