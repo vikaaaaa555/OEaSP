@@ -98,7 +98,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClassEx(&wcex);
 
     HWND hWnd = CreateWindow(_T("SyncApp"), _T("Synchronization Example"), WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 300, 150, nullptr, nullptr, hInstance, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 270, 110, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd) {
         return false;
